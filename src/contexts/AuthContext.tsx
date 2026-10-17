@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, refreshSession, onSessionExpired } from '@/lib/api';
+
 export interface User {
   id: string;
   username: string;
@@ -13,11 +14,9 @@ export interface User {
   email: string;
   is_verified: boolean;
   student_verification_status: string;
+  avatar_url?: string | null;
   avatarUrl?: string;
   role: string;
-}
-interface Session {
-  user: User;
 }
 interface Auth {
   user: User | null;
@@ -29,25 +28,28 @@ interface Auth {
   logout: () => Promise<void>;
 }
 const AuthContext = createContext<Auth | null>(null);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null),
-    [isLoading, setLoading] = useState(true),
-    [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     let active = true;
-    const unsubscribe = onSessionExpired(() => setUser(null));
+    const unsubscribe = onSessionExpired(() => {
+      if (active) setUser(null);
+    });
     refreshSession()
-      .then(async (r) => {
-        if (r.status === 401) return null;
-        if (!r.ok) throw Error('Session service unavailable');
-        return r.json() as Promise<Session>;
+      .then(async (response) => {
+        if (response.status === 401) return null;
+        if (!response.ok) throw new Error('Session service unavailable');
+        return api<User>('/users/me');
       })
-      .then((s) => {
-        if (active) setUser(s?.user ?? null);
+      .then((currentUser) => {
+        if (active) setUser(currentUser);
       })
       .catch(() => {
-        if (active)
-          setError('Unable to restore your session. Please try again.');
+        if (active) setError('Unable to restore your session. Please try again.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -57,24 +59,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe();
     };
   }, []);
+
   async function login(credentials: { email: string; password: string }) {
     setError(null);
-    const session = await api<Session>('/auth/login', {
+    await api('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    setUser(session.user);
+    const currentUser = await api<User>('/users/me');
+    setUser(currentUser);
   }
+
   async function logout() {
     await api('/auth/logout', { method: 'POST' });
     setUser(null);
   }
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated: !!user,
-        isAdmin: user?.role === 'admin',
+        isAdmin: false, // The backend has a separate admin host and session.
         isLoading,
         error,
         login,
