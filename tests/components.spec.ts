@@ -52,20 +52,19 @@ test('login and logout update context using cookies, theme choice persists', asy
       email: 'alex@example.com',
       password: 'test-only',
     });
-    await r.fulfill({
-      json: {
-        user: {
-          id: '1',
-          username: 'alex',
-          display_name: 'Alex Morgan',
-          email: 'alex@example.com',
-          is_verified: true,
-          student_verification_status: 'verified',
-          role: 'student',
-        },
-      },
-    });
+    await r.fulfill({ json: { message: 'Signed in' } });
   });
+  await page.route('**/users/me', (r) => r.fulfill({
+    json: {
+      id: '1',
+      username: 'alex',
+      display_name: 'Alex Morgan',
+      email: 'alex@example.com',
+      is_verified: true,
+      student_verification_status: 'verified',
+      role: 'student',
+    },
+  }));
   await page.route('**/auth/logout', (r) => r.fulfill({ status: 204 }));
   await page.goto('/tests/harness.html');
   await expect(page.getByTestId('auth')).toHaveText('anonymous');

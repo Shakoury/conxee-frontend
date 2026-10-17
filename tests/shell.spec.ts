@@ -1,17 +1,18 @@
 import { test, expect, type Page } from '@playwright/test';
 async function session(page: Page, role = 'student') {
   await page.route('**/auth/refresh', (route) =>
+    route.fulfill({ json: { message: 'Session refreshed' } }),
+  );
+  await page.route('**/users/me', (route) =>
     route.fulfill({
       json: {
-        user: {
-          id: '1',
-          username: 'alex',
-          display_name: 'Alex Morgan',
-          email: 'alex@example.com',
-          is_verified: true,
-          student_verification_status: 'verified',
-          role,
-        },
+        id: '1',
+        username: 'alex',
+        display_name: 'Alex Morgan',
+        email: 'alex@example.com',
+        is_verified: true,
+        student_verification_status: 'verified',
+        role,
       },
     }),
   );
@@ -93,22 +94,11 @@ test('all protected routes load, including static routes beside dynamic routes',
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/login$/);
 });
-test('admin routes require an admin session', async ({ page }) => {
+test('campus sessions cannot enter the separate admin area', async ({ page }) => {
   await session(page, 'admin');
-  for (const path of [
-    '/admin',
-    '/admin/users',
-    '/admin/verification',
-    '/admin/communities',
-    '/admin/reports',
-    '/admin/institutions',
-    '/admin/announcements',
-    '/admin/system',
-  ]) {
-    await page.goto(path);
-    await expect(page.locator('main h1')).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(path + '$'));
-  }
+  await page.goto('/admin');
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByText('Administration uses a separately protected sign-in.')).toBeVisible();
 });
 for (const width of [375, 768, 1440])
   test(`responsive shell ${width}px`, async ({ page }) => {
