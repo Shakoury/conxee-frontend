@@ -2,15 +2,6 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Logo } from '@/components/shared/Logo';
 export default function PublicLayout() {
   const { pathname } = useLocation();
-  const reusedAuth =
-    pathname.startsWith('/register') ||
-    [
-      '/auth',
-      '/login',
-      '/verify-email',
-      '/forgot-password',
-      '/reset-password',
-    ].includes(pathname);
   const auth =
     pathname.startsWith('/register') ||
     ['/landing', '/login', '/forgot-password', '/reset-password'].includes(
@@ -18,7 +9,7 @@ export default function PublicLayout() {
     );
   return (
     <div className="flex min-h-dvh flex-col">
-      {!auth && !reusedAuth && (
+      {!auth && (
         <header className="p-6">
           <Link to="/landing" aria-label="Conxee landing">
             <Logo />
@@ -28,7 +19,7 @@ export default function PublicLayout() {
       <main id="main-content" className="flex flex-1 flex-col">
         <Outlet />
       </main>
-      {auth && !reusedAuth && (
+      {auth && (
         <footer className="flex justify-center gap-6 px-5 pb-6 text-label text-muted">
           <Link
             to="/privacy"

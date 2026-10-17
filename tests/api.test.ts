@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.hoisted(() => vi.stubEnv('VITE_API_URL', 'https://api.conxee.test'));
 import { api, onSessionExpired } from '../src/lib/api';
 afterEach(() => vi.unstubAllGlobals());
 describe('cookie-based API client', () => {
@@ -16,9 +17,9 @@ describe('cookie-based API client', () => {
       }),
     ).resolves.toEqual({ ok: true });
     expect(fetch.mock.calls.map((c) => c[0])).toEqual([
-      '/api/resources',
-      '/api/auth/refresh',
-      '/api/resources',
+      'https://api.conxee.test/resources',
+      'https://api.conxee.test/auth/refresh',
+      'https://api.conxee.test/resources',
     ]);
     for (const [, options] of fetch.mock.calls)
       expect(options.credentials).toBe('include');
