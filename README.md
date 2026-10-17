@@ -13,7 +13,7 @@ cp .env.example .env # only if .env does not already exist
 npm run dev
 ```
 
-Vite serves on port 5173. `VITE_API_URL` is configured as `https://bukcz-api.13.61.98.162.sslip.io/api` and must identify the real backend for live sessions; no backend is included. Restart Vite after changing it. If unset, API requests use the current origin (for deployments with an API reverse proxy). Do not put secrets in VITE variables: they are public browser configuration.
+Vite serves on port 5173. `VITE_API_URL` is configured as `https://bukcz-api.13.61.98.162.sslip.io/api` and must identify the real backend for live sessions; no backend is included. The public `.env.production` supplies this URL for production builds. A Vercel project environment variable takes precedence; if configured there, set it to the same URL including `/api` and redeploy. Restart Vite after changing it. If unset, API requests use the current origin (for deployments with an API reverse proxy). Do not put secrets in VITE variables: they are public browser configuration.
 
 ## Validation
 
