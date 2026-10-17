@@ -375,3 +375,25 @@ for (const width of [375, 768, 1440])
       animations: 'disabled',
     });
   });
+
+test('account type choices are inline and persist across the current registration steps', async ({
+  page,
+}) => {
+  await page.goto('/register');
+  await expect(page.getByRole('radio')).toHaveCount(2);
+  await expect(page.getByRole('radio', { name: /^Student/ })).toBeChecked();
+  await page.getByText('Aspirant', { exact: true }).click();
+  await expect(page.getByRole('radio', { name: /^Aspirant/ })).toBeChecked();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page
+    .getByRole('combobox', { name: 'Institution', exact: true })
+    .fill('Lagos');
+  await page.getByRole('option', { name: institution.name }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByText('Step 2 of 5')).toBeVisible();
+  await page.getByRole('link', { name: 'Back', exact: true }).click();
+  await expect(page.getByRole('radio', { name: /^Aspirant/ })).toBeChecked();
+  await expect(
+    page.getByRole('combobox', { name: 'Institution', exact: true }),
+  ).toHaveValue(institution.name);
+});

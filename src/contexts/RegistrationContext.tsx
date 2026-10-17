@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 export interface RegistrationData {
+  account_type: 'student' | 'aspirant';
   institution_id: string;
   institution_name: string;
   institution_source_id: string;
@@ -21,6 +22,7 @@ export interface RegistrationData {
   resendAt: number;
 }
 const empty: RegistrationData = {
+  account_type: 'student',
   institution_id: '',
   institution_name: '',
   institution_source_id: '',
