@@ -1,6 +1,6 @@
 # CONXEE web frontend — Batch 0
 
-React 19, Vite 6, TypeScript, Tailwind CSS 4, React Router 7, and shadcn-style components built on Radix primitives. This batch contains the design system, responsive navigation shells and placeholder routes only. No Batch 1 features or login forms are implemented.
+React 19, Vite 6, TypeScript, Tailwind CSS 4, React Router 7, and shadcn-style components built on Radix primitives. This batch contains the design system, responsive navigation shells, working login form and placeholder feature routes. Registration and Batch 1 social features are not implemented.
 
 ## Development
 
@@ -13,7 +13,7 @@ cp .env.example .env # only if .env does not already exist
 npm run dev
 ```
 
-Vite serves on port 5173. `VITE_API_URL` is configured as `https://bukcz-api.13.61.98.162.sslip.io` and must identify the real backend for live sessions; no backend is included. The public `.env.production` supplies this URL for production builds. A Vercel project environment variable takes precedence; if configured there, set it to the same URL without `/api` and redeploy. Restart Vite after changing it. If unset, API requests use the current origin (for deployments with an API reverse proxy). Do not put secrets in VITE variables: they are public browser configuration.
+Vite serves on port 5173. In production, set `VITE_API_URL=/api` in Vercel project environment variables (matching `.env.production`). `vercel.json` proxies `/api/*` to the existing backend root. This same-origin deployment is required for the backend's Secure, HttpOnly, SameSite=Strict cookies. For local browser authentication use a trusted HTTPS proxy rather than calling the unrelated backend domain directly. The development `.env.example` still points to the backend for non-session API checks; direct cross-site cookie authentication will not work. Never put secrets in VITE variables.
 
 ## Validation
 
@@ -29,17 +29,18 @@ Browser tests use `/usr/bin/chromium` in this cloud environment. Elsewhere set `
 
 All requests use `credentials: "include"`; tokens are never read by JavaScript or stored in localStorage.
 
-- `POST /auth/login`: JSON `{ email, password }`, response `{ user }`.
-- `POST /auth/refresh`: response `{ user }`, or 401 for no valid session.
+- `POST /auth/login`: JSON `{ email, password }`, response `{ message: "Signed in" }`, sets the session cookies.
+- `POST /auth/refresh`: response `{ message: "Session refreshed" }`, renews cookies, or 401 for no valid session.
+- `GET /users/me`: returns the authenticated user profile directly, not nested in `{ user }`.
 - `POST /auth/logout`: success JSON or 204.
 - `POST /auth/register`: direct backend path, reserved for the later registration implementation.
 
 `API_PUBLIC_PREFIX=/api` only rewrites asset URLs in responses; it is not a route prefix.
-- User shape: `{ id, username, display_name, email, role, is_verified, student_verification_status }`. Admin access requires `role: "admin"`. An optional `avatarUrl` can be used when supplied.
+- User shape: `{ id, username, display_name, email, role, is_verified, student_verification_status }`. Campus user roles do not grant access to the separate administrator session or host. Avatar fields may use `avatar_url`.
 
-The login and refresh response shapes and HttpOnly cookie session handling were confirmed by the user. The backend must configure credentialed CORS for the frontend origin, appropriate HttpOnly cookie attributes, and CSRF protection. Cross-origin cookies may require `SameSite=None; Secure`. The API wrapper shares concurrent refreshes and retries protected requests once on 401. Backend authorization remains authoritative; frontend guards provide navigation behavior only.
+Backend source inspection confirmed the login/refresh success-message responses and the separate user-profile endpoint. The backend retains Secure, HttpOnly, SameSite=Strict cookies; do not weaken the cookie settings to accommodate cross-site browser authentication. Keep the production origin allowlist and reverse proxy aligned. The API wrapper shares concurrent refreshes and retries protected requests once on 401. Backend authorization remains authoritative; frontend guards provide navigation behavior only.
 
-Auth context exposes `user`, `isAuthenticated`, `isAdmin`, `isLoading`, `error`, `login()` and `logout()`. Session restoration failures leave the user unauthenticated. Public pages are intentionally placeholders. A denied admin navigation reaches Login with an `admin-required` navigation state, preventing the ordinary authenticated-login redirect from immediately sending the user home.
+Auth context exposes `user`, `isAuthenticated`, `isAdmin`, `isLoading`, `error`, `login()` and `logout()`. Session restoration failures leave the user unauthenticated. Public pages are intentionally placeholders. A denied admin navigation reaches Login with an `admin-required` navigation state, preventing the ordinary authenticated-login redirect from immediately sending the user home. The campus AuthContext intentionally never claims administrator authentication.
 
 ## Theme and tokens
 
