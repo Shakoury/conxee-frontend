@@ -42,6 +42,7 @@ function StudentForm() {
       await api('/auth/register', {
         method: 'POST',
         body: JSON.stringify({
+          account_type: data.account_type,
           institution_id: data.institution_id,
           faculty: data.faculty,
           department: data.department,

@@ -94,6 +94,7 @@ test('five-step signup submits real institution ID and omits optional student ID
     {
       path: 'register',
       body: {
+        account_type: 'student',
         institution_id: institution.id,
         faculty: 'Sciences',
         department: 'Computer Science',
@@ -396,4 +397,31 @@ test('account type choices are inline and persist across the current registratio
   await expect(
     page.getByRole('combobox', { name: 'Institution', exact: true }),
   ).toHaveValue(institution.name);
+});
+
+test('aspirant selection is sent with the unchanged registration fields and steps', async ({
+  page,
+}) => {
+  let submitted: unknown;
+  await page.route('**/auth/register', async (route) => {
+    submitted = route.request().postDataJSON();
+    await route.fulfill({ json: { message: 'OK' } });
+  });
+  await institutionStep(page);
+  await page.getByRole('link', { name: 'Back', exact: true }).click();
+  await page.getByText('Aspirant', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByText('Step 2 of 5')).toBeVisible();
+  await facultyStep(page);
+  await detailsStep(page);
+  await verifiedStep(page);
+  await page.getByRole('button', { name: 'Skip for now' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(submitted).toEqual({
+    account_type: 'aspirant',
+    institution_id: institution.id,
+    faculty: 'Sciences',
+    department: 'Computer Science',
+    ...details,
+  });
 });

@@ -32,7 +32,7 @@ Production retains `VITE_API_URL=/api` and the same-origin Vercel proxy; these a
 | Login                            | POST `/auth/login`               | `{ email, password }`                                                                           |
 | First code request / resend      | POST `/auth/resend-verification` | `{ email }`                                                                                     |
 | Verify code                      | POST `/auth/verify-email`        | `{ email, code }`                                                                               |
-| Create account / skip student ID | POST `/auth/register`            | `{ institution_id, faculty, department, display_name, username, email, password, student_id? }` |
+| Create account / skip student ID | POST `/auth/register`            | `{ account_type, institution_id, faculty, department, display_name, username, email, password, student_id? }` |
 | Forgot password                  | POST `/auth/forgot-password`     | `{ email }`                                                                                     |
 | Reset password                   | POST `/auth/reset-password`      | `{ token, password }`                                                                           |
 
@@ -70,4 +70,4 @@ The BUKCZ reference is used solely for the auth screens' visual appearance: spli
 
 The BUKCZ behavior port is reverted. Conxee retains its original nine screens, route-per-step navigation, registration context, React Hook Form/Zod validation, OTP verification, API wrapper, payloads and request order. The existing landing page, shells and other features are unchanged. Presentation code is limited to AuthFrame and `src/styles/auth-design.css`, with the two required visual assets.
 
-The Institution screen also presents Student and Aspirant as two inline radio-card choices, with Student selected initially. The selection is retained in the in-memory registration draft when moving between steps. This is a design-only addition: the existing registration request, fields, validation, step order and backend calls remain unchanged; `account_type` is not sent. No popup selector is used. The additional browser test checks both options, absence of dialogs and selection persistence.
+The Institution screen also presents Student and Aspirant as two inline radio-card choices, with Student selected initially. The selection is retained in the in-memory registration draft when moving between steps. Per the user’s follow-up, the existing registration request now additionally sends the selected `account_type` (`student` or `aspirant`). All other fields, validation, steps and backend routes remain unchanged. No popup selector is used. The additional browser test checks both options, absence of dialogs and selection persistence.
