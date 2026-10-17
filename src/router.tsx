@@ -78,6 +78,18 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            path: '/auth',
+            lazy: async () => ({
+              Component: (await import('./pages/Login')).default,
+            }),
+          },
+          {
+            path: '/verify-email',
+            lazy: async () => ({
+              Component: (await import('./pages/RegisterVerify')).default,
+            }),
+          },
+          {
             path: '/register/institution',
             lazy: async () => ({
               Component: (await import('./pages/RegisterInstitution')).default,

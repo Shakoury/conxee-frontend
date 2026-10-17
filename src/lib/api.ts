@@ -1,12 +1,6 @@
-const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+import { ApiError, responseError } from './auth-errors';
+export { ApiError };
+const base = '/api';
 let refreshPromise: Promise<Response> | null = null;
 const listeners = new Set<() => void>();
 export function onSessionExpired(listener: () => void) {
@@ -37,11 +31,23 @@ export async function api<T = void>(
     !headers.has('Content-Type')
   )
     headers.set('Content-Type', 'application/json');
-  const response = await fetch(`${base}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+      signal: options.signal ?? AbortSignal.timeout(30000),
+    });
+  } catch {
+    throw new ApiError(
+      0,
+      options.method && options.method !== 'GET'
+        ? 'The request could not be confirmed. Check your connection before trying again.'
+        : 'We could not connect. Check your connection and try again.',
+      'NETWORK_ERROR',
+    );
+  }
   if (response.status === 401 && retry && !path.startsWith('/auth/')) {
     const refreshed = await refreshSession();
     if (refreshed.ok) return api<T>(path, options, false);
@@ -49,8 +55,15 @@ export async function api<T = void>(
   }
   if (response.status === 401 && !path.startsWith('/auth/'))
     listeners.forEach((fn) => fn());
-  if (!response.ok)
-    throw new ApiError(response.status, `Request failed (${response.status})`);
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw responseError(
+      response.status,
+      data,
+      path,
+      response.headers.get('x-request-id'),
+    );
+  }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }

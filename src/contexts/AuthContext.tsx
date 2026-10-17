@@ -26,6 +26,7 @@ interface Auth {
   error: string | null;
   login: (credentials: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
+  reload: () => Promise<User | null>;
 }
 const AuthContext = createContext<Auth | null>(null);
 
@@ -49,7 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (active) setUser(currentUser);
       })
       .catch(() => {
-        if (active) setError('Unable to restore your session. Please try again.');
+        if (active)
+          setError('Unable to restore your session. Please try again.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -60,6 +62,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  async function reload() {
+    setError(null);
+    try {
+      const profile = await api<User>('/users/me');
+      if (
+        !profile ||
+        typeof profile.id !== 'string' ||
+        typeof profile.username !== 'string'
+      )
+        throw Error('Invalid profile');
+      setUser(profile);
+      return profile;
+    } catch {
+      setUser(null);
+      return null;
+    }
+  }
   async function login(credentials: { email: string; password: string }) {
     setError(null);
     await api('/auth/login', {
@@ -85,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         login,
         logout,
+        reload,
       }}
     >
       {children}

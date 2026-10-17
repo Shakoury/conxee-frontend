@@ -1,65 +1,54 @@
-# Batch 1 — Registration and authentication
+# Batch 1 — BUKCZ auth replacement
 
-The nine requested screens are implemented as lazy React Router 7 pages: Landing, Login, Institution, Faculty & Department, Account Details, Email Verification, optional Student ID, Forgot Password, and Reset Password. `/register/institution` remains an alias of `/register`.
+The current login, registration and recovery implementation is ported from `Shakoury/BUKCZ` at commit `c04c5b137bcbaa1411a083aa395be4c6a42a1276`, specifically `frontend/src/production/auth-pages.tsx`, `signup.tsx`, `institution-picker.tsx`, and their required UI helpers/styles/assets. This supersedes the earlier Shadcnblocks-based Batch 1 implementation.
 
-The centered card structure adapts the public [Shadcnblocks Signup 1](https://shadcnblocks.com/block/signup1) and [Login 1](https://shadcnblocks.com/block/login1) React source, retrieved from their public registry. The supplied `/group/` URLs now return 404; their current categories are `/blocks/signup` and `/blocks/login`. The category does not offer a ready-made five-step wizard, so Signup 1 was extended with five routes, shared progress, draft state, route guards, keyboard navigation and reduced-motion-aware transitions. There are no Next.js imports or social-auth buttons without a backend.
+Scope is **authentication and registration only**, following the user's clarification. Conxee's landing page, authenticated navigation/layouts, feature placeholders and admin separation are retained. Feed, chat, groups, marketplace, Watch and other BUKCZ feature implementations were not imported.
 
-## State and validation
+## Source flow
 
-React Hook Form and Zod validate all forms. Passwords require 8–128 characters; usernames require 3–30 letters, numbers or underscores. Confirm-password checks run before requests. Errors are associated with each field for screen readers. Requests disable the relevant controls while pending; registration errors preserve the draft for correction and retry.
+BUKCZ's login/signup tabs, desktop story panel, compact mobile forms, five-step wizard, institution search dialog, academic selectors, missing-entry submission, student/aspirant options, optional student ID, verification-link page and password recovery are reused under `src/features/bukcz-auth/`.
 
-RegistrationContext holds the entire draft in React memory, including the password. Neither localStorage nor sessionStorage stores registration data. Returning through earlier steps preserves submitted values. Changing an institution clears faculty/department; changing the email invalidates verification. Reloading discards the draft and redirects deep links to the earliest incomplete step. Arriving at Login clears the draft, including after successful registration. The backend must independently enforce verification and validation; client guards are navigation conveniences.
+The registration steps are Institution → Faculty → Programme → optional Student ID → Account details. Registration happens before verification. The body is the backend's strict nationwide registration contract:
 
-## Institutions and suggestions
-
-The exact `ng-universities` npm name is unavailable (public registry E404). Per the user's instruction to use the public NUC catalogue, institution search uses the backend's confirmed public endpoint:
-
+```json
+{
+  "account_type": "student",
+  "display_name": "Example Student",
+  "username": "example.student",
+  "email": "student@example.com",
+  "password": "example-password-123",
+  "academic_context": {
+    "institution_id": "<UUID>",
+    "faculty_id": "<UUID>",
+    "programme_id": "<UUID>"
+  }
+}
 ```
-GET /institutions?q=Lagos
-{ "data": [{ "id": "<UUID>", "name": "University of Lagos, Lagos", ... }], "next_after": null }
-```
 
-A live read confirmed real UUIDs and government source URLs, including `https://enuc.nuc.edu.ng/nus`, as well as approved polytechnic/college sources. Institution IDs are always taken from this response, never invented from names or replaced by package slugs. Search uses a 250ms debounce and cancels superseded requests. Up to 30 visible results are offered; refine the search for a more specific match. The official NUC website is an authoritative source, not a promise of a separate stable public JSON API.
+`student_id` is included only when supplied for a student account. Missing institutions use `institution_name` plus `institution_type`; missing academic choices use `faculty_name` and `programme_name` instead of their IDs. These entries go to catalogue review. The directory is queried through `/institutions?q=…&limit=20`; academic choices come from `/academics?institution_id=…`. The unrelated university npm dataset and the old registration context/forms were removed.
 
-The available ISC-licensed `@i-302/ng-unis` package supplies faculty/department suggestions for its four covered universities. It is not the institution authority and its coverage is limited. Both fields accept new free-text entries. The backend institution-scoped faculty/department paths returned 404; no unsupported backend catalogue endpoints are silently presented as working.
+Passwords follow BUKCZ's 12–72 character limits and 72-byte UTF-8 guard. Registration state stays in React component memory and is lost on reload; credentials are not stored in browser storage. Student eligibility remains separate from email confirmation.
 
-## Auth requests
+## Routes and cookies
 
-Production retains `VITE_API_URL=/api` and the same-origin Vercel proxy; these are frontend proxy paths, not a backend `/api` route prefix. All requests use the central API wrapper with `credentials: "include"`. Login/refresh success messages are followed by `GET /users/me`, preserving the already confirmed backend contract. HttpOnly cookies stay inaccessible to JavaScript.
+- `/login` and `/auth`: source login/signup page, Login tab selected.
+- `/register`: same source page, Signup tab selected.
+- Legacy `/register/institution`, `/register/faculty`, `/register/details`, `/register/student-id`: redirect to the consolidated source wizard.
+- `/verify-email` and `/register/verify`: token-link verification and resend page.
+- `/forgot-password` and `/reset-password?token=…`: source password recovery.
 
-| Trigger                          | Backend route                    | JSON body                                                                                       |
-| -------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Login                            | POST `/auth/login`               | `{ email, password }`                                                                           |
-| First code request / resend      | POST `/auth/resend-verification` | `{ email }`                                                                                     |
-| Verify code                      | POST `/auth/verify-email`        | `{ email, code }`                                                                               |
-| Create account / skip student ID | POST `/auth/register`            | `{ institution_id, faculty, department, display_name, username, email, password, student_id? }` |
-| Forgot password                  | POST `/auth/forgot-password`     | `{ email }`                                                                                     |
-| Reset password                   | POST `/auth/reset-password`      | `{ token, password }`                                                                           |
+Registration returns to `/verify-email`. The verification page reads the emailed `token`, fetches `/auth/verification-details`, then posts `{ token }` to `/auth/verify-email`. There is no six-digit OTP or pre-registration verification request in this source flow. Login handles `EMAIL_VERIFICATION_REQUIRED`, loads `/users/me` after cookie login, and then returns to Conxee's home page. Password recovery validates the backend success messages before showing completion. The campus AuthContext never grants the separate admin session.
 
-The user confirmed email verification is supported before account creation. Step 3 requests the initial code, Step 4 verifies it, and only Step 5 creates the account. Resend has a 60-second client cooldown; backend rate limits remain authoritative. The optional student ID is omitted when skipped or blank. Registration success returns to Login with a confirmation message; login success goes to `/`. Reset reads `token` from the query string and blocks submission when it is absent. Forgot-password success does not disclose whether an email has an account.
+All requests use the central API wrapper with the same-origin `/api` proxy, `credentials: "include"`, shared 401 refresh and approved backend error codes/support references. `VITE_API_URL` no longer controls requests, matching BUKCZ's fixed proxy transport. Vercel's existing API rewrite remains unchanged. A development-only Vite `/api` proxy targets `BUKCZ_DEV_API_TARGET` or the existing HTTPS backend; browser-cookie authentication still requires the backend's allowed Origin and correct HTTPS/cookie configuration.
 
-## Validation and review
+Only auth selectors from BUKCZ's stylesheets were copied/scoped. Required dialog portals have auth-specific classes so styles do not affect Conxee's existing dialogs, feature pages or layout shells. BUKCZ's brand mark/background are included solely for the auth pages.
 
-Run `npm run build`, `npm test`, and `npm run test:e2e`. With an existing injected VITE_API_URL, it overrides .env files; use `VITE_API_URL=/api npm run build` when verifying the production proxy configuration. Playwright tests mock auth endpoints to exercise success, rejection, OTP retry/cooldown, registration with/without student ID, password reset, field validation, keyboard selection, search retry, and memory-only state.
+## Verification
 
-`artifacts/batch1-*.png` includes each screen at 375px, 768px and 1440px. Screenshots finish entrance animations before capture. Automated WCAG AA checks cover the account form in both themes at each width; earlier shell checks remain in the suite. Automated checks do not replace human accessibility review.
+Run `npm run build`, `npm test`, `npm run test:e2e`. Browser tests use mocked responses to verify the real source-shaped registration payload, academic catalogue selection, missing entries/aspirants, optional student ID, password confirmation and byte limits, login/profile loading, verification-token requests, recovery, and responsive screenshots. Existing shell/component tests continue to check Conxee's retained features. Mock-backed tests do not establish live email delivery, cookie issuance, deployed backend availability or real account creation.
 
-Live institution lookup was verified. Direct empty-body auth probes returned 403 before useful payload validation, so successful email delivery, OTP validation, account creation and password reset against the deployed backend are not claimed. No real user account was created or reset during testing. These flows require a deployment with the same-origin proxy and an authorized test account/email for live validation.
+BUKCZ's full backend/PostgreSQL/Redis integration suite is not copied into this standalone auth-only change and is not claimed as executed. No real account/email was used for registration or reset during these checks.
 
-Batch 2 has not started and requires approval.
+Current preview files are `artifacts/bukcz-auth-login-{375,768,1440}.png`, `artifacts/bukcz-auth-signup-{375,768,1440}.png`, and `artifacts/bukcz-auth-details-{375,768,1440}.png`. Earlier `batch1-*` auth screenshots were removed; the unchanged landing previews are retained. This change does not implement unrelated later-batch features.
 
-## Screenshots
-
-| Screen               | 375px                                             | 768px                                             | 1440px                                              |
-| -------------------- | ------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------- |
-| Landing              | [375px](artifacts/batch1-landing-375.png)         | [768px](artifacts/batch1-landing-768.png)         | [1440px](artifacts/batch1-landing-1440.png)         |
-| Login                | [375px](artifacts/batch1-login-375.png)           | [768px](artifacts/batch1-login-768.png)           | [1440px](artifacts/batch1-login-1440.png)           |
-| Institution          | [375px](artifacts/batch1-institution-375.png)     | [768px](artifacts/batch1-institution-768.png)     | [1440px](artifacts/batch1-institution-1440.png)     |
-| Faculty & department | [375px](artifacts/batch1-faculty-375.png)         | [768px](artifacts/batch1-faculty-768.png)         | [1440px](artifacts/batch1-faculty-1440.png)         |
-| Account details      | [375px](artifacts/batch1-signup-375.png)          | [768px](artifacts/batch1-signup-768.png)          | [1440px](artifacts/batch1-signup-1440.png)          |
-| Email verification   | [375px](artifacts/batch1-verification-375.png)    | [768px](artifacts/batch1-verification-768.png)    | [1440px](artifacts/batch1-verification-1440.png)    |
-| Student ID           | [375px](artifacts/batch1-student-id-375.png)      | [768px](artifacts/batch1-student-id-768.png)      | [1440px](artifacts/batch1-student-id-1440.png)      |
-| Forgot password      | [375px](artifacts/batch1-forgot-password-375.png) | [768px](artifacts/batch1-forgot-password-768.png) | [1440px](artifacts/batch1-forgot-password-1440.png) |
-| Reset password       | [375px](artifacts/batch1-reset-password-375.png)  | [768px](artifacts/batch1-reset-password-768.png)  | [1440px](artifacts/batch1-reset-password-1440.png)  |
-
-Final local result: production build passed using `VITE_API_URL=/api`; 5 API unit tests and all 20 Playwright tests passed. Live auth success remains unverified.
+Validation result: production build, all 5 API tests and all 20 browser tests passed. The browser auth flows use mocks and do not establish live backend/email delivery.

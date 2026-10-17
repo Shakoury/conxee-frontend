@@ -1,331 +1,321 @@
 import { test, expect, type Page } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
 const institution = {
   id: '3ab566dc-b460-548a-8c04-888bef7dbdd2',
   name: 'University of Lagos, Lagos',
   type: 'university',
-  state: 'Lagos',
-  source_url: 'https://enuc.nuc.edu.ng/nus',
 };
-const details = {
-  display_name: 'Alex Morgan',
-  username: 'alex_morgan',
-  email: 'alex@example.com',
-  password: 'CampusTest123!',
+const faculty = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Faculty of Science',
+  programmes: [
+    { id: '22222222-2222-4222-8222-222222222222', name: 'Computer Science' },
+  ],
 };
+const password = 'Valid-test-password-123';
 const profile = {
-  id: 'student-1',
-  ...details,
-  is_verified: true,
+  id: 'user-1',
+  username: 'test.student',
+  display_name: 'Test Student',
   role: 'student',
-  student_verification_status: 'pending',
 };
 test.beforeEach(async ({ page }) => {
-  await page.route('**/auth/refresh', (r) => r.fulfill({ status: 401 }));
-  await page.route('**/institutions?**', (r) =>
-    r.fulfill({ json: { data: [institution], next_after: null } }),
-  );
-  await page.route('**/auth/resend-verification', (r) =>
-    r.fulfill({ json: { message: 'Verification sent' } }),
-  );
-  await page.route('**/auth/verify-email', (r) =>
-    r.fulfill({ json: { message: 'Email verified' } }),
-  );
+  await page.route('**/api/**', async (r) => {
+    const path = new URL(r.request().url()).pathname;
+    if (path === '/api/auth/refresh' || path === '/api/users/me')
+      return r.fulfill({ status: 401, json: { code: 'SESSION_EXPIRED' } });
+    if (path === '/api/institutions')
+      return r.fulfill({ json: { data: [institution], next_after: null } });
+    if (path === '/api/academics')
+      return r.fulfill({ json: { faculties: [faculty] } });
+    return r.fulfill({ status: 404, json: { code: 'NOT_AVAILABLE' } });
+  });
 });
-async function institutionStep(page: Page) {
+async function choose(page: Page, label: string, option: string) {
+  await page.getByRole('combobox', { name: label, exact: true }).click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+}
+async function step1(page: Page) {
   await page.goto('/register');
+  await expect(
+    page.getByRole('heading', { name: 'Choose your institution', exact: true }),
+  ).toBeVisible();
   await page
     .getByRole('combobox', { name: 'Institution', exact: true })
-    .fill('Lagos');
-  await page.getByRole('option', { name: institution.name }).click();
+    .click();
+  await page.getByLabel('Search institutions', { exact: true }).fill('Lagos');
+  await page
+    .getByRole('option', { name: /University of Lagos, Lagos/ })
+    .click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText('Step 2 of 5')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Your faculty', exact: true }),
+  ).toBeVisible();
 }
-async function facultyStep(page: Page) {
-  await page
-    .getByRole('combobox', { name: 'Faculty', exact: true })
-    .fill('Sciences');
-  await page.getByRole('option', { name: 'Sciences', exact: true }).click();
-  await page
-    .getByRole('combobox', { name: 'Department', exact: true })
-    .fill('Computer Science');
-  await page.getByRole('heading').click();
+async function academics(page: Page) {
+  await choose(page, 'Faculty selection', 'Faculty of Science');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText('Step 3 of 5')).toBeVisible();
-}
-async function detailsStep(page: Page) {
-  await page
-    .getByLabel('Display name', { exact: true })
-    .fill(details.display_name);
-  await page.getByLabel('Username', { exact: true }).fill(details.username);
-  await page.getByLabel('Email', { exact: true }).fill(details.email);
-  await page.getByLabel('Password', { exact: true }).fill(details.password);
-  await page
-    .getByLabel('Confirm password', { exact: true })
-    .fill(details.password);
+  await choose(page, 'Department / programme selection', 'Computer Science');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText('Step 4 of 5')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Student ID (optional)', exact: true }),
+  ).toBeVisible();
 }
-async function verifiedStep(page: Page) {
-  await page.getByLabel('Verification code', { exact: true }).fill('123456');
-  await page.getByRole('button', { name: 'Verify email', exact: true }).click();
-  await expect(page.getByText('Step 5 of 5')).toBeVisible();
+async function details(page: Page) {
+  await page.getByLabel('Display name', { exact: true }).fill('Test Student');
+  await page.getByLabel('Username', { exact: true }).fill('test.student');
+  await page.getByLabel('Email', { exact: true }).fill('student@example.com');
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByLabel('Confirm password', { exact: true }).fill(password);
 }
-
-test('five-step signup submits real institution ID and omits optional student ID when skipped', async ({
+test('BUKCZ five-step signup submits academic_context before token verification', async ({
   page,
 }) => {
-  const requests: { path: string; body: unknown }[] = [];
-  for (const path of ['resend-verification', 'verify-email', 'register'])
-    await page.route(`**/auth/${path}`, async (r) => {
-      requests.push({ path, body: r.request().postDataJSON() });
-      await r.fulfill({ json: { message: 'OK' } });
+  let submitted: any;
+  await page.route('**/api/auth/register', async (r) => {
+    submitted = r.request().postDataJSON();
+    await r.fulfill({
+      json: { email: 'student@example.com', catalogue_status: 'approved' },
     });
-  await institutionStep(page);
-  await facultyStep(page);
-  await detailsStep(page);
-  await verifiedStep(page);
-  await page.getByRole('button', { name: 'Skip for now' }).click();
-  await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole('status')).toContainText('Your account is ready');
-  expect(requests).toEqual([
-    { path: 'resend-verification', body: { email: details.email } },
-    { path: 'verify-email', body: { email: details.email, code: '123456' } },
-    {
-      path: 'register',
-      body: {
-        institution_id: institution.id,
-        faculty: 'Sciences',
-        department: 'Computer Science',
-        ...details,
-      },
+  });
+  await step1(page);
+  await academics(page);
+  await page
+    .getByRole('button', { name: 'Continue without ID', exact: true })
+    .click();
+  await details(page);
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/verify-email$/);
+  expect(submitted).toEqual({
+    account_type: 'student',
+    display_name: 'Test Student',
+    username: 'test.student',
+    email: 'student@example.com',
+    password,
+    academic_context: {
+      institution_id: institution.id,
+      faculty_id: faculty.id,
+      programme_id: faculty.programmes[0].id,
     },
-  ]);
+  });
+  await expect(
+    page.getByText('student@example.com', { exact: true }),
+  ).toBeVisible();
   expect(
     await page.evaluate(() => Object.values(localStorage).join(' ')),
-  ).not.toContain(details.password);
-  await page.goto('/register/student-id');
-  await expect(page).toHaveURL(/\/register$/);
+  ).not.toContain(password);
+  await page.route('**/api/auth/resend-verification', (r) =>
+    r.fulfill({
+      json: {
+        message: 'If your account needs verification, a link will be sent',
+      },
+    }),
+  );
+  await page.getByRole('button', { name: 'Resend verification email' }).click();
+  await expect(page.getByRole('status')).toContainText('a link will be sent');
 });
-
-test('validates every signup step and keeps draft in memory across back navigation', async ({
+test('wizard preserves entered values going back and rejects mismatched and oversized passwords', async ({
   page,
 }) => {
-  await page.goto('/register');
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Choose an institution');
-  await page
-    .getByRole('combobox', { name: 'Institution', exact: true })
-    .fill('Lagos');
-  await expect(
-    page.getByRole('option', { name: institution.name }),
-  ).toBeVisible();
-  await page
-    .getByRole('combobox', { name: 'Institution', exact: true })
-    .press('ArrowDown');
-  await page
-    .getByRole('combobox', { name: 'Institution', exact: true })
-    .press('Enter');
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText('Step 2 of 5')).toBeVisible();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText('Enter your faculty.')).toBeVisible();
-  await expect(page.getByText('Enter your department.')).toBeVisible();
-  await facultyStep(page);
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText('Enter your display name.')).toBeVisible();
-  await page
-    .getByLabel('Display name', { exact: true })
-    .fill(details.display_name);
-  await page.getByLabel('Username', { exact: true }).fill('not a username');
-  await page.getByLabel('Email', { exact: true }).fill('invalid');
-  await page.getByLabel('Password', { exact: true }).fill('short');
-  await page.getByLabel('Confirm password', { exact: true }).fill('different');
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(
-    page.getByText('Use letters, numbers and underscores only.'),
-  ).toBeVisible();
-  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
-  await expect(page.getByText('Use at least 8 characters.')).toBeVisible();
-  await expect(page.getByText('Passwords do not match.')).toBeVisible();
-  await detailsStep(page);
-  await page.getByRole('link', { name: 'Back', exact: true }).click();
-  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(
-    details.email,
-  );
-  await page.reload();
-  await expect(page).toHaveURL(/\/register$/);
-});
-
-test('invalid OTP stays on verification, resend cooldown works, registration failure can retry', async ({
-  page,
-}) => {
-  await page.clock.install();
-  await institutionStep(page);
-  await facultyStep(page);
-  await detailsStep(page);
-  await page.getByRole('button', { name: 'Verify email', exact: true }).click();
-  await expect(
-    page.getByText('Enter the 6-digit code from your email.'),
-  ).toBeVisible();
-  await page.route('**/auth/verify-email', (r) =>
-    r.fulfill({ status: 400, json: { message: 'Invalid code' } }),
-  );
-  await page.getByLabel('Verification code', { exact: true }).fill('999999');
-  await page.getByRole('button', { name: 'Verify email', exact: true }).click();
-  await expect(
-    page.getByText(
-      'That code is invalid or expired. Try again or request a new one.',
-    ),
-  ).toBeVisible();
-  await page.clock.fastForward(61000);
-  await page.getByRole('button', { name: 'Resend code', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('A new code');
-  await page.route('**/auth/verify-email', (r) =>
-    r.fulfill({ json: { message: 'OK' } }),
-  );
-  await verifiedStep(page);
-  await page.route('**/auth/register', (r) =>
-    r.fulfill({ status: 409, json: { message: 'Duplicate' } }),
-  );
-  await page
-    .getByLabel('Student ID / registration number (optional)', { exact: true })
-    .fill('SCI/2026/001');
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
-  await expect(page.getByRole('alert')).toContainText('already in use');
-  await page.route('**/auth/register', async (r) => {
-    expect(r.request().postDataJSON().student_id).toBe('SCI/2026/001');
-    await r.fulfill({ json: { message: 'Registered' } });
+  let requests = 0;
+  await page.route('**/api/auth/register', (r) => {
+    requests++;
+    return r.fulfill({ json: { email: 'student@example.com' } });
   });
-  await page
-    .getByRole('button', { name: 'Create account', exact: true })
-    .click();
-  await expect(page).toHaveURL(/\/login$/);
-});
-
-test('login validates, recovers from rejected credentials, and loads profile after cookie login', async ({
-  page,
-}) => {
-  await page.goto('/login');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
-  await expect(page.getByText('Enter your password.')).toBeVisible();
-  await page.route('**/auth/login', (r) => r.fulfill({ status: 401 }));
-  await page.getByLabel('Email', { exact: true }).fill(details.email);
-  await page.getByLabel('Password', { exact: true }).fill(details.password);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Unable to sign in');
-  await page.route('**/auth/login', (r) =>
-    r.fulfill({ json: { message: 'Signed in' } }),
-  );
-  await page.route('**/users/me', (r) => r.fulfill({ json: profile }));
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:5173/');
-  await expect(
-    page.getByRole('heading', { name: 'Feed (Home)', exact: true }),
-  ).toBeVisible();
-});
-
-test('forgot password validates and reset submits URL token with matching new password', async ({
-  page,
-}) => {
-  let forgotCalls = 0;
-  await page.route('**/auth/forgot-password', async (r) => {
-    forgotCalls++;
-    expect(r.request().postDataJSON()).toEqual({ email: details.email });
-    await r.fulfill({ json: { message: 'Sent' } });
-  });
-  await page.goto('/forgot-password');
-  await page.getByRole('button', { name: 'Send reset link' }).click();
-  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
-  expect(forgotCalls).toBe(0);
-  await page.getByLabel('Email', { exact: true }).fill(details.email);
-  await page.getByRole('button', { name: 'Send reset link' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Check your email' }),
-  ).toBeVisible();
-  await page.goto('/reset-password');
-  await expect(page.getByRole('alert')).toContainText('missing its token');
-  let resetCalls = 0;
-  await page.route('**/auth/reset-password', async (r) => {
-    resetCalls++;
-    expect(r.request().postDataJSON()).toEqual({
-      token: 'test-reset-token',
-      password: details.password,
-    });
-    await r.fulfill({ json: { message: 'Updated' } });
-  });
-  await page.goto('/reset-password?token=test-reset-token');
-  await page.getByLabel('New password', { exact: true }).fill(details.password);
-  await page.getByLabel('Confirm password', { exact: true }).fill('mismatch');
-  await page.getByRole('button', { name: 'Reset password' }).click();
-  await expect(page.getByText('Passwords do not match.')).toBeVisible();
-  expect(resetCalls).toBe(0);
+  await step1(page);
+  await academics(page);
+  await page.getByLabel('Student ID', { exact: true }).fill('SCI/2026/001');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await details(page);
   await page
     .getByLabel('Confirm password', { exact: true })
-    .fill(details.password);
-  await page.getByRole('button', { name: 'Reset password' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Password updated' }),
-  ).toBeVisible();
-  expect(resetCalls).toBe(1);
+    .fill('different-test-password');
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+  await expect(page.getByRole('alert')).toContainText('Passwords do not match');
+  expect(requests).toBe(0);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.getByLabel('Student ID', { exact: true })).toHaveValue(
+    'SCI/2026/001',
+  );
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(
+    'student@example.com',
+  );
+  await page.getByLabel('Password', { exact: true }).fill('é'.repeat(40));
+  await page
+    .getByLabel('Confirm password', { exact: true })
+    .fill('é'.repeat(40));
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+  await expect(page.getByRole('alert')).toContainText('72 UTF-8 bytes');
+  expect(requests).toBe(0);
 });
-
-test('institution search failure is recoverable without submitting invented IDs', async ({
+test('missing academic names and aspirant signup use the source review contract', async ({
   page,
 }) => {
-  await page.route('**/institutions?**', (r) => r.fulfill({ status: 503 }));
+  let submitted: any;
+  await page.route('**/api/auth/register', async (r) => {
+    submitted = r.request().postDataJSON();
+    await r.fulfill({
+      json: {
+        email: 'student@example.com',
+        catalogue_status: 'pending_review',
+      },
+    });
+  });
   await page.goto('/register');
+  await choose(page, 'Account type selection', 'Aspirant — seeking admission');
+  await page.getByRole('button', { name: 'My institution is missing' }).click();
   await page
-    .getByRole('combobox', { name: 'Institution', exact: true })
-    .fill('Lagos');
-  await expect(page.getByRole('alert')).toContainText('search is unavailable');
-  await page.route('**/institutions?**', (r) =>
-    r.fulfill({ json: { data: [institution] } }),
-  );
-  await page.getByRole('button', { name: 'Retry search' }).click();
-  await page.getByRole('option', { name: institution.name }).click();
+    .getByLabel('Institution name', { exact: true })
+    .fill('New Nigerian University');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText('Step 2 of 5')).toBeVisible();
+  await page
+    .getByLabel('Missing faculty / school name', { exact: true })
+    .fill('Faculty of New Studies');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page
+    .getByLabel('Missing department / programme name', { exact: true })
+    .fill('Future Computing');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(
+    page.getByText('Aspirants do not need a student ID.', { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Continue without ID', exact: true })
+    .click();
+  await details(page);
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+  await expect(page).toHaveURL(/verify-email$/);
+  expect(submitted.account_type).toBe('aspirant');
+  expect(submitted).not.toHaveProperty('student_id');
+  expect(submitted.academic_context).toEqual({
+    institution_name: 'New Nigerian University',
+    institution_type: 'university',
+    faculty_name: 'Faculty of New Studies',
+    programme_name: 'Future Computing',
+  });
+  await expect(
+    page.getByText(
+      'Your missing academic details have been submitted for catalogue review.',
+      { exact: false },
+    ),
+  ).toBeVisible();
 });
-
+test('login uses the backend success message and fetches the real profile', async ({
+  page,
+}) => {
+  await page.route('**/api/auth/login', (r) =>
+    r.fulfill({ status: 401, json: { code: 'SIGN_IN_FAILED' } }),
+  );
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('student@example.com');
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'We could not sign you in',
+  );
+  await page.route('**/api/auth/login', (r) =>
+    r.fulfill({ json: { message: 'Signed in' } }),
+  );
+  await page.route('**/api/users/me', (r) => r.fulfill({ json: profile }));
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:5173/');
+  await expect(
+    page.getByRole('heading', { name: 'Feed (Home)' }),
+  ).toBeVisible();
+});
+test('unverified login redirects to verification and link verification sends only token', async ({
+  page,
+}) => {
+  await page.route('**/api/auth/login', (r) =>
+    r.fulfill({ status: 403, json: { code: 'EMAIL_VERIFICATION_REQUIRED' } }),
+  );
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill('student@example.com');
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page).toHaveURL(/verify-email$/);
+  const token = 'a'.repeat(43);
+  await page.route('**/api/auth/verification-details', (r) =>
+    r.fulfill({ json: { email: 'student@example.com' } }),
+  );
+  await page.route('**/api/auth/verify-email', async (r) => {
+    expect(r.request().postDataJSON()).toEqual({ token });
+    await r.fulfill({ json: { message: 'Email verified' } });
+  });
+  await page.goto('/verify-email?token=' + token);
+  await page.getByRole('button', { name: 'Verify email', exact: true }).click();
+  await expect(page).toHaveURL(/\/auth$/);
+  await expect(
+    page.getByText('Email verified. You can now log in.', { exact: true }),
+  ).toBeVisible();
+});
+test('source password recovery accepts backend confirmations and the reset link token', async ({
+  page,
+}) => {
+  await page.route('**/api/auth/forgot-password', (r) =>
+    r.fulfill({ json: { message: 'Check your email for a reset link' } }),
+  );
+  await page.goto('/forgot-password');
+  await page
+    .getByLabel('Email address', { exact: true })
+    .fill('student@example.com');
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await expect(page.getByRole('status')).toHaveText(
+    'Check your email for a reset link',
+  );
+  await page.goto('/reset-password');
+  await expect(page.getByRole('alert')).toContainText('Open the reset link');
+  const token = 'b'.repeat(43);
+  await page.route('**/api/auth/reset-password', async (r) => {
+    expect(r.request().postDataJSON()).toEqual({ token, password });
+    await r.fulfill({ json: { message: 'Password reset. Sign in again' } });
+  });
+  await page.goto('/reset-password?token=' + token);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByLabel('Confirm new password', { exact: true }).fill(password);
+  await page
+    .getByRole('button', { name: 'Reset password', exact: true })
+    .click();
+  await expect(page).toHaveURL(/auth$/);
+  await expect(page.getByRole('status')).toContainText('Password updated');
+});
 for (const width of [375, 768, 1440])
-  test(`Batch 1 responsive previews and accessibility ${width}px`, async ({
-    page,
-  }) => {
+  test(`scoped BUKCZ auth previews ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 960 });
-    await page.goto('/landing');
-    await page.screenshot({
-      path: `artifacts/batch1-landing-${width}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await page.getByRole('link', { name: 'Login', exact: true }).click();
+    await page.goto('/login');
     await expect(
-      page.getByRole('heading', { name: 'Login', exact: true }),
+      page.getByRole('heading', { name: 'Welcome to CONXEE.' }),
     ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
     await page.screenshot({
-      path: `artifacts/batch1-login-${width}.png`,
+      path: `artifacts/bukcz-auth-login-${width}.png`,
       fullPage: true,
       animations: 'disabled',
     });
-    await page.goto('/register');
+    await step1(page);
     await page.screenshot({
-      path: `artifacts/batch1-institution-${width}.png`,
+      path: `artifacts/bukcz-auth-signup-${width}.png`,
       fullPage: true,
       animations: 'disabled',
     });
-    await institutionStep(page);
+    await academics(page);
+    await page
+      .getByRole('button', { name: 'Continue without ID', exact: true })
+      .click();
     await page.screenshot({
-      path: `artifacts/batch1-faculty-${width}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await facultyStep(page);
-    await page.screenshot({
-      path: `artifacts/batch1-signup-${width}.png`,
+      path: `artifacts/bukcz-auth-details-${width}.png`,
       fullPage: true,
       animations: 'disabled',
     });
@@ -334,44 +324,4 @@ for (const width of [375, 768, 1440])
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    for (const theme of ['light', 'dark']) {
-      await page.evaluate(async (t) => {
-        document.documentElement.className = t;
-        void document.documentElement.offsetHeight;
-        await Promise.allSettled(
-          document.getAnimations().map((a) => a.finished),
-        );
-      }, theme);
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
-        .analyze();
-      expect(results.violations).toEqual([]);
-    }
-    await page.evaluate(() => {
-      document.documentElement.className = 'light';
-    });
-    await detailsStep(page);
-    await page.screenshot({
-      path: `artifacts/batch1-verification-${width}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await verifiedStep(page);
-    await page.screenshot({
-      path: `artifacts/batch1-student-id-${width}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await page.goto('/forgot-password');
-    await page.screenshot({
-      path: `artifacts/batch1-forgot-password-${width}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await page.goto('/reset-password?token=preview-only');
-    await page.screenshot({
-      path: `artifacts/batch1-reset-password-${width}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    });
   });

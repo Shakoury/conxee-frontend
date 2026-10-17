@@ -1,0 +1,120 @@
+.signup-wizard {
+  display: grid;
+  gap: 16px;
+}
+.signup-progress {
+  display: flex;
+  justify-content: space-between;
+  padding: 0;
+  margin: 8px 0;
+  list-style: none;
+}
+.signup-progress li {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--cx-text);
+  background: var(--cx-soft);
+  border: 1px solid var(--cx-control-line);
+  font-size: 14px;
+  font-weight: 700;
+}
+.signup-progress li.completed {
+  color: white;
+  background: var(--primary);
+}
+.signup-progress li[aria-current] {
+  outline: 2px solid var(--cx-control-line);
+  outline-offset: 2px;
+}
+.signup-policy {
+  padding: 16px;
+  background: var(--cx-selected);
+  border: 1px solid var(--cx-control-line);
+  border-radius: 12px;
+}
+.signup-wizard h3 {
+  margin: 0;
+  font-size: 24px;
+}
+.signup-wizard p {
+  margin: 0;
+  line-height: 1.5;
+}
+.signup-institutions {
+  display: grid;
+  gap: 8px;
+  max-height: min(320px, 40dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.signup-institutions button {
+  min-height: 56px;
+  padding: 12px 16px;
+  text-align: left;
+  border: 1px solid var(--cx-control-line);
+  border-radius: 12px;
+  background: var(--cx-surface);
+  color: var(--cx-text);
+}
+.signup-institutions button.selected {
+  border: 2px solid var(--cx-accent-text);
+  background: var(--cx-selected);
+}
+.signup-institutions small {
+  display: block;
+  margin-top: 4px;
+  text-transform: capitalize;
+}
+.signup-summary {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--cx-control-line);
+  border-radius: 12px;
+}
+.signup-summary span {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.signup-actions {
+  display: flex;
+  gap: 12px;
+}
+.signup-actions > button {
+  flex: 1;
+}
+@media (max-width: 600px) {
+  .signup-wizard {
+    gap: 12px;
+  }
+  .signup-wizard h3 {
+    font-size: 22px;
+  }
+}
+
+.signup-institution-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.signup-institution-picker .campus-selection-trigger > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.signup-institution-dialog {
+  width: min(540px, calc(100vw - 32px));
+}
+.signup-institution-dialog label {
+  display: grid;
+  gap: 8px;
+}
+.signup-institution-status {
+  padding: 12px 0;
+  color: var(--cx-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}

@@ -24,7 +24,7 @@ test('anonymous users are redirected and public pages remain accessible', async 
   await page.goto('/communities/123/files');
   await expect(page).toHaveURL(/\/login$/);
   await expect(
-    page.getByRole('heading', { name: 'Login', exact: true }),
+    page.getByRole('heading', { name: 'Welcome to CONXEE.', exact: true }),
   ).toBeVisible();
   for (const path of [
     '/register',
@@ -42,7 +42,9 @@ test('anonymous users are redirected and public pages remain accessible', async 
     '/error',
   ]) {
     await page.goto(path);
-    await expect(page.locator('main h1')).toBeVisible();
+    await expect(
+      page.getByRole('main').getByRole('heading').first(),
+    ).toBeVisible();
   }
   await page.goto('/unknown');
   await expect(page).toHaveURL(/\/404$/);
@@ -84,7 +86,9 @@ test('all protected routes load, including static routes beside dynamic routes',
     '/settings/help',
   ]) {
     await page.goto(path);
-    await expect(page.locator('main h1')).toBeVisible();
+    await expect(
+      page.getByRole('main').getByRole('heading').first(),
+    ).toBeVisible();
     await expect(page).toHaveURL(new URL(path, 'http://127.0.0.1:5173').href);
   }
   await page.goto('/login');
@@ -94,11 +98,15 @@ test('all protected routes load, including static routes beside dynamic routes',
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/login$/);
 });
-test('campus sessions cannot enter the separate admin area', async ({ page }) => {
+test('campus sessions cannot enter the separate admin area', async ({
+  page,
+}) => {
   await session(page, 'admin');
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByText('Administration uses a separately protected sign-in.')).toBeVisible();
+  await expect(
+    page.getByText('Administration uses a separately protected sign-in.'),
+  ).toBeVisible();
 });
 for (const width of [375, 768, 1440])
   test(`responsive shell ${width}px`, async ({ page }) => {
