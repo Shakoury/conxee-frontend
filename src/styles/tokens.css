@@ -131,3 +131,17 @@ button:disabled {
   --space-12: 48px;
   --space-16: 64px;
 }
+
+@keyframes auth-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.auth-enter {
+  animation: auth-enter 180ms ease-out;
+}

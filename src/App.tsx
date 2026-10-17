@@ -1,4 +1,5 @@
 import { RouterProvider } from 'react-router-dom';
+import { RegistrationProvider } from '@/contexts/RegistrationContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ToastProvider } from '@/components/ui/toast';
@@ -16,7 +17,9 @@ export default function App() {
             Skip to content
           </a>
           <OfflineBanner />
-          <RouterProvider router={router} />
+          <RegistrationProvider>
+            <RouterProvider router={router} />
+          </RegistrationProvider>
         </ToastProvider>
       </AuthProvider>
     </ThemeProvider>

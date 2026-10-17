@@ -1,92 +1,114 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ApiError } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { AuthFrame } from '@/components/auth/AuthFrame';
+import {
+  FormField,
+  PasswordInput,
+  SubmitButton,
+  FormError,
+  fieldA11y,
+} from '@/components/auth/FormFields';
 import { Input } from '@/components/ui/input';
-
+import { useAuth } from '@/contexts/AuthContext';
+import { useRegistration } from '@/contexts/RegistrationContext';
+import { loginSchema } from '@/lib/auth-schemas';
+import { ApiError } from '@/lib/api';
+import { authError } from '@/lib/auth-errors';
 export default function Login() {
   const { login } = useAuth();
-  const navigate = useNavigate();
+  const { reset } = useRegistration();
+  useEffect(() => reset(), [reset]);
   const location = useLocation();
-  const [pending, setPending] = useState(false);
+  const navigate = useNavigate();
   const [error, setError] = useState('');
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending) return;
-    const data = new FormData(event.currentTarget);
-    setPending(true);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
+  async function submit(values: { email: string; password: string }) {
     setError('');
     try {
-      await login({
-        email: String(data.get('email') ?? '').trim(),
-        password: String(data.get('password') ?? ''),
-      });
-      // Only permit local destinations. Never redirect to a supplied external URL.
-      const from = location.state?.from;
-      const destination =
-        typeof from === 'string' &&
-        from.startsWith('/') &&
-        !from.startsWith('//') &&
-        !from.startsWith('/\\') &&
-        !from.startsWith('/admin')
-          ? from
-          : '/';
-      navigate(destination, { replace: true });
+      await login(values);
+      reset();
+      navigate('/', { replace: true });
     } catch (cause) {
       setError(
         cause instanceof ApiError && cause.status === 401
           ? 'Unable to sign in. Check your credentials and email verification.'
-          : 'Sign-in is unavailable. Please try again.',
+          : authError(cause),
       );
-    } finally {
-      setPending(false);
     }
   }
-
   return (
-    <section className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-12">
-      <h1 className="text-h1">Login</h1>
-      <p className="mt-2 text-caption text-muted">Sign in to your CONXEE account.</p>
+    <AuthFrame
+      title="Login"
+      description="Welcome back. Your campus is waiting."
+      footer={
+        <>
+          New to Conxee?{' '}
+          <Link
+            to="/register"
+            className="font-semibold text-foreground underline underline-offset-4"
+          >
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      {location.state?.registered && (
+        <p role="status" className="mb-5 rounded-lg bg-hover p-3 text-caption">
+          Your account is ready. Log in to get started.
+        </p>
+      )}
       {location.state?.reason === 'admin-required' && (
-        <p role="alert" className="mt-4 rounded-lg border border-line bg-hover p-3 text-caption">
+        <p role="alert" className="mb-5 text-caption text-muted">
           Administration uses a separately protected sign-in.
         </p>
       )}
-      <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
-        <div>
-          <label htmlFor="login-email" className="mb-2 block text-caption font-medium">Email</label>
+      <form noValidate onSubmit={handleSubmit(submit)} className="space-y-5">
+        <FormField id="email" label="Email" error={errors.email?.message}>
           <Input
-            id="login-email"
-            name="email"
+            id="email"
             type="email"
             autoComplete="email"
-            required
-            maxLength={254}
-            disabled={pending}
+            placeholder="you@university.edu.ng"
+            disabled={isSubmitting}
+            {...register('email')}
+            {...fieldA11y('email', errors.email?.message)}
           />
-        </div>
-        <div>
-          <label htmlFor="login-password" className="mb-2 block text-caption font-medium">Password</label>
-          <Input
-            id="login-password"
-            name="password"
-            type="password"
+        </FormField>
+        <FormField
+          id="password"
+          label="Password"
+          error={errors.password?.message}
+        >
+          <PasswordInput
+            id="password"
             autoComplete="current-password"
-            required
-            disabled={pending}
+            disabled={isSubmitting}
+            {...register('password')}
+            {...fieldA11y('password', errors.password?.message)}
           />
+        </FormField>
+        <div className="text-right">
+          <Link
+            to="/forgot-password"
+            className="inline-flex min-h-11 items-center text-caption font-medium underline underline-offset-4"
+          >
+            Forgot password?
+          </Link>
         </div>
-        {error && <p role="alert" className="text-caption text-danger">{error}</p>}
-        <Button type="submit" disabled={pending}>
-          {pending ? 'Signing in…' : 'Sign in'}
-        </Button>
+        <FormError message={error} />
+        <SubmitButton pending={isSubmitting}>
+          {isSubmitting ? 'Signing in…' : 'Sign in'}
+        </SubmitButton>
       </form>
-      <div className="mt-6 flex justify-between gap-3 text-caption">
-        <Link to="/forgot-password" className="underline">Forgot password?</Link>
-        <Link to="/register" className="underline">Create an account</Link>
-      </div>
-    </section>
+    </AuthFrame>
   );
 }

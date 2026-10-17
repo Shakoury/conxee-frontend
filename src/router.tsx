@@ -102,6 +102,18 @@ export const router = createBrowserRouter([
             }),
           },
           {
+            path: '/register/student-id',
+            lazy: async () => ({
+              Component: (await import('./pages/RegisterStudentId')).default,
+            }),
+          },
+          {
+            path: '/reset-password',
+            lazy: async () => ({
+              Component: (await import('./pages/ResetPassword')).default,
+            }),
+          },
+          {
             path: '/forgot-password',
             lazy: async () => ({
               Component: (await import('./pages/ForgotPassword')).default,

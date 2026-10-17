@@ -1,6 +1,6 @@
-# CONXEE web frontend — Batch 0
+# CONXEE web frontend — Batches 0 and 1
 
-React 19, Vite 6, TypeScript, Tailwind CSS 4, React Router 7, and shadcn-style components built on Radix primitives. This batch contains the design system, responsive navigation shells, working login form and placeholder feature routes. Registration and Batch 1 social features are not implemented.
+React 19, Vite 6, TypeScript, Tailwind CSS 4, React Router 7, and shadcn-style components built on Radix primitives. The app contains the design system, responsive navigation shells, registration/authentication screens and placeholder feature routes. See [Batch 1 implementation and verification](BATCH1.md) for the five-step signup flow, endpoint contracts, package substitution and screenshots. Social features and Batch 2 are not implemented.
 
 ## Development
 
@@ -36,11 +36,12 @@ All requests use `credentials: "include"`; tokens are never read by JavaScript o
 - `POST /auth/register`: direct backend path, reserved for the later registration implementation.
 
 `API_PUBLIC_PREFIX=/api` only rewrites asset URLs in responses; it is not a route prefix.
+
 - User shape: `{ id, username, display_name, email, role, is_verified, student_verification_status }`. Campus user roles do not grant access to the separate administrator session or host. Avatar fields may use `avatar_url`.
 
 Backend source inspection confirmed the login/refresh success-message responses and the separate user-profile endpoint. The backend retains Secure, HttpOnly, SameSite=Strict cookies; do not weaken the cookie settings to accommodate cross-site browser authentication. Keep the production origin allowlist and reverse proxy aligned. The API wrapper shares concurrent refreshes and retries protected requests once on 401. Backend authorization remains authoritative; frontend guards provide navigation behavior only.
 
-Auth context exposes `user`, `isAuthenticated`, `isAdmin`, `isLoading`, `error`, `login()` and `logout()`. Session restoration failures leave the user unauthenticated. Public pages are intentionally placeholders. A denied admin navigation reaches Login with an `admin-required` navigation state, preventing the ordinary authenticated-login redirect from immediately sending the user home. The campus AuthContext intentionally never claims administrator authentication.
+Auth context exposes `user`, `isAuthenticated`, `isAdmin`, `isLoading`, `error`, `login()` and `logout()`. Session restoration failures leave the user unauthenticated. Authentication pages are implemented; other public content pages remain placeholders. A denied admin navigation reaches Login with an `admin-required` navigation state, preventing the ordinary authenticated-login redirect from immediately sending the user home. The campus AuthContext intentionally never claims administrator authentication.
 
 ## Theme and tokens
 
@@ -56,4 +57,4 @@ Mobile uses top and bottom bars below 768px; tablet uses an icon sidebar at 768�
 
 ## Review artifacts
 
-`artifacts/` includes 375px mobile, 768px tablet, 1440px desktop, a dark-theme capture, and a screenshot of the real folder structure. Shell screenshots use a mocked authenticated session, with no production auth bypass. Browser tests regenerate the screenshots. Batch 1 is pending review and approval.
+`artifacts/` includes 375px mobile, 768px tablet, 1440px desktop, a dark-theme capture, and a screenshot of the real folder structure. Shell screenshots use a mocked authenticated session, with no production auth bypass. Browser tests regenerate the screenshots. Batch 1 screenshots and verification details are in [BATCH1.md](BATCH1.md). Batch 2 requires review and approval.

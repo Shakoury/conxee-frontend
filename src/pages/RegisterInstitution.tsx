@@ -1,4 +1,4 @@
-import Placeholder from '@/components/shared/Placeholder';
+import { Navigate } from 'react-router-dom';
 export default function RegisterInstitution() {
-  return <Placeholder name="Register Institution" />;
+  return <Navigate to="/register" replace />;
 }
